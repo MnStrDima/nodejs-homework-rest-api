@@ -41,6 +41,17 @@ const contactUpdateFavoriteStatusSchema = Joi.object({
   favorite: Joi.boolean().required(),
 });
 
+const queryContactsSchema = Joi.object({
+  sortBy: Joi.string().valid("name", "email", "phone", "favorite").optional(),
+  sortByDesc: Joi.string()
+    .valid("name", "email", "phone", "favorite")
+    .optional(),
+  filter: Joi.string().valid("name", "email", "phone", "favorite").optional(),
+  limit: Joi.number().integer().min(1).max(50).optional(),
+  page: Joi.number().integer().min(0).optional(),
+  favorite: Joi.boolean().optional(),
+}).without("sortBy", "sortByDesc");
+
 const validate = async (schema, contactObj, next) => {
   try {
     await schema.validateAsync(contactObj);
@@ -51,6 +62,9 @@ const validate = async (schema, contactObj, next) => {
 };
 
 module.exports = {
+  validationQueryContact: async (req, res, next) => {
+    return await validate(queryContactsSchema, req.query, next);
+  },
   validationAddContact: async (req, res, next) => {
     return await validate(contactAddSchema, req.body, next);
   },
