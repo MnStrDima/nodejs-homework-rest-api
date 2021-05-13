@@ -7,7 +7,7 @@ const getAllContacts = async (req, res, next) => {
     return res.json({
       status: "success",
       code: 200,
-      data: { contacts },
+      data: contacts,
     });
   } catch (e) {
     next(e);
