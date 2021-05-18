@@ -4,6 +4,7 @@ const fs = require("fs/promises");
 const path = require("path");
 const Users = require("../model/users");
 const { HTTP_CODE, SUBSCRIPTION } = require("../helpers/constants");
+const EmailService = require("../services/email");
 require("dotenv").config();
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
@@ -23,14 +24,23 @@ const registration = async (req, res, next) => {
 
   try {
     const newUser = await Users.createUser(req.body);
+    const { name, email, subscription, avatarURL, verifyToken } = newUser;
+    try {
+      const emailService = new EmailService(process.env.NODE_ENV);
+      await emailService.sendVerifyEmail(verifyToken, email, name);
+    } catch (err) {
+      console.log(err.message);
+    }
+
     return res.status(HTTP_CODE.CREATED).json({
       Status: `${HTTP_CODE.CREATED} Created`,
       ContentType: "application/json",
       ResponseBody: {
         user: {
-          email: newUser.email,
-          subscription: SUBSCRIPTION.STARTER,
-          avatarURL: newUser.avatarURL,
+          name,
+          email,
+          subscription,
+          avatarURL,
         },
       },
     });
@@ -43,7 +53,7 @@ const logIn = async (req, res, next) => {
   const { email, password } = req.body;
   const user = await Users.findUserByEmail(email);
   const isValidPassword = await user?.validPassword(password);
-  if (!user || !isValidPassword) {
+  if (!user || !isValidPassword || !user.verify) {
     return res.status(HTTP_CODE.UNAUTHORIZED).json({
       Status: `${HTTP_CODE.UNAUTHORIZED} Unauthorized`,
       ResponseBody: {
@@ -170,6 +180,68 @@ const saveUserAvatar = async (req) => {
   return path.join(STATIC_DIR, newAvatarName);
 };
 
+const emailVerify = async (req, res, next) => {
+  try {
+    const user = await Users.findUserByVerificationToken(
+      req.params.verificationToken
+    );
+    if (user) {
+      await Users.updateVerificationToken(user.id, true, null);
+      return res.status(HTTP_CODE.OK).json({
+        Status: `${HTTP_CODE.OK} OK`,
+        ResponseBody: {
+          message: "Verification successful",
+        },
+      });
+    }
+    return res.status(HTTP_CODE.NOT_FOUND).json({
+      Status: `${HTTP_CODE.NOT_FOUND} Not Found`,
+      ResponseBody: {
+        message: "User not found",
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const repeatEmailVerify = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await Users.findUserByEmail(email);
+    if (user.verify) {
+      return res.status(HTTP_CODE.BAD_REQUEST).json({
+        Status: `${HTTP_CODE.BAD_REQUEST} Bad Request`,
+        ContentType: "application/json",
+        ResponseBody: {
+          message: "Verification has already been passed",
+        },
+      });
+    }
+    if (user) {
+      const { name, email, verifyToken } = user;
+      const emailService = new EmailService(process.env.NODE_ENV);
+      await emailService.sendVerifyEmail(verifyToken, email, name);
+      return res.status(HTTP_CODE.OK).json({
+        Status: `${HTTP_CODE.OK} OK`,
+        ContentType: "application/json",
+        ResponseBody: {
+          message: "Verification email sent",
+        },
+      });
+    }
+    return res.status(HTTP_CODE.NOT_FOUND).json({
+      Status: `${HTTP_CODE.NOT_FOUND} Not found`,
+      ContentType: "application/json",
+      ResponseBody: {
+        message: "User not found",
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   registration,
   logIn,
@@ -177,4 +249,6 @@ module.exports = {
   getCurrent,
   updateSubscription,
   updateAvatar,
+  emailVerify,
+  repeatEmailVerify,
 };
