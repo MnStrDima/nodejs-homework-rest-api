@@ -1,8 +1,9 @@
+const bcrypt = require("bcryptjs");
+const gravatar = require("gravatar");
+const { nanoid } = require("nanoid");
 const mongoose = require("mongoose");
 const { Schema, model } = mongoose;
-const gravatar = require("gravatar");
 const { SUBSCRIPTION } = require("../../helpers/constants");
-const bcrypt = require("bcryptjs");
 
 const SALT_COUNT = 6;
 
@@ -40,6 +41,15 @@ const userSchema = new Schema(
     token: {
       type: String,
       default: null,
+    },
+    verify: {
+      type: Boolean,
+      default: false,
+    },
+    verifyToken: {
+      type: String,
+      required: [true, "Verify token is required"],
+      default: nanoid(),
     },
   },
   {

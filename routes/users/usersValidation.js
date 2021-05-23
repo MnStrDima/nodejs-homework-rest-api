@@ -33,12 +33,28 @@ const userUpdateSubscriptionSchema = Joi.object({
     .required(),
 });
 
+const userRepeatVerifySchema = Joi.object({
+  email: Joi.string()
+    .email({
+      minDomainSegments: 2,
+      tlds: { allow: ["com", "net"] },
+    })
+    .required(),
+});
+
+// {
+//   message: "Missing required field email";
+// }
 const validate = async (schema, userObj, next) => {
   try {
     await schema.validateAsync(userObj);
     return next();
   } catch (err) {
-    next({ status: 400, message: err.message });
+    console.log(err.details[0].context.label);
+    next({
+      status: 400,
+      message: `Missing required ${err.details[0].context.label} field.`,
+    });
   }
 };
 
@@ -51,5 +67,8 @@ module.exports = {
   },
   validateUpdatingUserSubscription: async (req, res, next) => {
     return await validate(userUpdateSubscriptionSchema, req.body, next);
+  },
+  validateUserVerification: async (req, res, next) => {
+    return await validate(userRepeatVerifySchema, req.body, next);
   },
 };
